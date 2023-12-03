@@ -1,36 +1,32 @@
-import { MongoClient } from 'mongodb';
+import { createClient } from 'redis';
+import { promisify } from 'util';
 
-const HOST = process.env.DB_HOST || 'localhost';
-const PORT = process.env.DB_PORT || 27017;
-const DATABASE = process.env.DB_DATABASE || 'files_manager';
-const url = `mongodb://${HOST}:${PORT}`;
-
-class DBClient {
+class RedisClient {
   constructor () {
-    this.client = new MongoClient(url, { useUnifiedTopology: true, useNewUrlParser: true });
-    this.client.connect().then(() => {
-      this.db = this.client.db(`${DATABASE}`);
-    }).catch((err) => {
-      console.log(err);
-    });
+    this.myClient = createClient();
+    this.myClient.on('error', (error) => console.log(error));
   }
 
   isAlive () {
-    return this.client.isConnected();
+    return this.myClient.connected;
   }
 
-  async nbUsers () {
-    const users = this.db.collection('users');
-    const usersNum = await users.countDocuments();
-    return usersNum;
+  async get (key) {
+    const getAsync = promisify(this.myClient.GET).bind(this.myClient);
+    return getAsync(key);
   }
 
-  async nbFiles () {
-    const files = this.db.collection('files');
-    const filesNum = await files.countDocuments();
-    return filesNum;
+  async set (key, val, time) {
+    const setAsync = promisify(this.myClient.SET).bind(this.myClient);
+    return setAsync(key, val, 'EX', time);
+  }
+
+  async del (key) {
+    const delAsync = promisify(this.myClient.DEL).bind(this.myClient);
+    return delAsync(key);
   }
 }
 
-const dbClient = new DBClient();
-module.exports = dbClient;
+const redisClient = new RedisClient();
+
+export default redisClient;
